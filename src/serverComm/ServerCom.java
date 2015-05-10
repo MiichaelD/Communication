@@ -18,6 +18,8 @@ public abstract class ServerCom{
 		PUT;
 	}
 	
+	protected String m_mainUrl = null;
+	
     public static final String CHARSET = "UTF-8";
 
     /** Default connection timeout is 2.5 secs*/
@@ -31,17 +33,40 @@ public abstract class ServerCom{
      * 4) we do lose a bit of responsibility over this variable but its state is irrelevant for this class */
     protected Map<String, String> m_requestProperties = null;
     
-
-
     /**Check if we are connected a network regardless if it's wifi's or mobile's
      * @return true if we are connected to a network, otherwise false     */
     public abstract boolean isNetworkAvailable();
+    
+    /** create a new connection
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception      */
+    public HttpURLConnection openConnection()throws Exception{
+    	return openConnection(Method.GET,m_mainUrl,buildQuery(null));//we leave buildQuery method to remove ambiguousness
+    }
 
     /** create a new connection
-     * @params int method:  0 for no query, 1 for metod GET, 2 for metod POST
-     * @params string url:	string containing the url
-     * @params Map query:   map containing pairs of properties and values to be added to the connection as query string
-     * @return an HttpURLConnection or null if there is no network available     */
+     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception     */
+    public HttpURLConnection openConnection( Map<String,String> queryMap)throws Exception{
+    	return openConnection(Method.GET,m_mainUrl,buildQuery(queryMap));
+    }
+    
+    /** create a new connection
+     * @params int method:  HTTP method to use
+     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception     */
+    public HttpURLConnection openConnection(Method method, Map<String,String> queryMap)throws Exception{
+    	return openConnection(method,m_mainUrl,buildQuery(queryMap));
+    }
+    
+    /** create a new connection
+     * @params int method:  HTTP method to use
+     * @params string url:	String containing the url
+     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception     */
     public HttpURLConnection openConnection(Method method, String url, Map<String,String> queryMap)throws Exception{
     	return openConnection(method,url,buildQuery(queryMap));
     }
@@ -50,9 +75,9 @@ public abstract class ServerCom{
      * @params int method:    0 for no query, 1 for metod GET, 2 for metod POST
      * @params string url:    string containing the url
      * @params string query:    string containing the query
-     * @return an HttpURLConnection or null if there is no network available     */
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception     */
     private HttpURLConnection openConnection(Method method, String url, String query)throws Exception{
-
         if( !isNetworkAvailable() )
             return null;
 
@@ -81,6 +106,12 @@ public abstract class ServerCom{
                 output.close();
             }catch(IOException ex){    System.out.println(ex.getMessage());}
             break;
+        case PUT:
+        	//TODO
+        	break;
+        case DELETE:
+        	//TODO
+        	break;
         default:
             conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setUseCaches(true);
@@ -91,6 +122,9 @@ public abstract class ServerCom{
         return conn;
     }
     
+    /** Iterate through the map to create a encoded and formated query string
+     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @return Query string formated and encoded*/
     public final String buildQuery(Map<String, String> queryMap){
     	if (queryMap == null)
     		return null;
@@ -103,21 +137,28 @@ public abstract class ServerCom{
 			hasNext = it.hasNext();
 			try {
 				sb.append(URLEncoder.encode(pair.getKey(),CHARSET)).append('=').append((URLEncoder.encode(pair.getValue(),CHARSET)));
+				if(hasNext)
+					sb.append('&');
 			} catch (UnsupportedEncodingException e) {
-				// Do nothing, since charset UTF-8 is fully supported by every virtual machine
+				// Do nothing, since UTF-8 charset is fully supported by every virtual machine.
 			}
-			if(hasNext)
-				sb.append('&');
 		}
     	return sb.toString();
     }
-    
+
+    /** Iterate through the map of properties and add them to the connection request 
+     * @params conn   recently open HttpURLConnection to add requests properties.
+     * @return Query string formated and encoded*/
     private final void addRequestProperties(HttpURLConnection conn){
     	if(m_requestProperties != null){
     		Iterator<Map.Entry<String, String>> it =  m_requestProperties.entrySet().iterator();
     		while (it.hasNext()){
     			Map.Entry<String,String> pair = it.next();
-    			conn.addRequestProperty(pair.getKey(),pair.getValue());	
+    			try {
+    				conn.addRequestProperty(URLEncoder.encode(pair.getKey(),CHARSET), URLEncoder.encode(pair.getValue(),CHARSET));
+    			} catch (UnsupportedEncodingException e) {
+    				// Do nothing, since UTF-8 charset is fully supported by every virtual machine.
+    			}
     		}
     	}
     }
@@ -151,8 +192,7 @@ public abstract class ServerCom{
      * should have the necessary query parameters included.
      * @param mUrl servers URL
      * @return a string containing the servers response or null if no network is available
-     * @throws Exception
-     */
+     * @throws Exception */
     public String getResponse(String mUrl) throws Exception    {
         if( !isNetworkAvailable() )
             return null;
@@ -174,7 +214,7 @@ public abstract class ServerCom{
     }
 
 
-
+    /** print useful information about the given HttpURLConnection*/
     public void printConnProps(HttpURLConnection conn)throws IOException{
         System.out.println("method: "+conn.getRequestMethod());
         System.out.println("response code: "+conn.getResponseCode());
@@ -188,13 +228,11 @@ public abstract class ServerCom{
         System.out.println("\n");
     }
 
-
-/**
- * This method is for practice and test only, it has no real funcitonality
+ /* This method is for practice and test only, it has no real funcitonality
  * @param methodType
  * @param Info
- * @return
-
+ * @return */
+/*
     @SuppressWarnings("unused")
     private static String ApacheREST(int methodType, String Info){
 
@@ -260,7 +298,6 @@ public abstract class ServerCom{
         }
         return null;
     }
-
 */
 
 
