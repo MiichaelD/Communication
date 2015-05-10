@@ -199,29 +199,13 @@ public abstract class ServerCom{
     }
 
 
-    /**Connect to a server by its URL using GET method, obviously the URL
+    /**Connect to a server by its URL using GET method, the URL
      * should have the necessary query parameters included.
-     * @param mUrl servers URL
+     * @param url servers URL
      * @return a string containing the servers response or null if no network is available
      * @throws Exception */
-    public String getResponse(String mUrl) throws Exception    {
-        if( !isNetworkAvailable() )
-            return null;
-        HttpURLConnection conn;
-        Scanner rd;
-        StringBuilder response=new StringBuilder();
-        try {
-            conn = (HttpURLConnection) new URL(mUrl).openConnection();
-            conn.setRequestMethod("GET");
-            rd = new Scanner(conn.getInputStream());
-            while (rd.hasNextLine()) {
-                response.append(rd.nextLine());
-            }
-            rd.close();
-        } catch (Exception e) {
-            throw e;
-        }
-        return response.toString();
+    public String getResponse(String url) throws Exception    {
+    	return getResponse(openConnection(Method.GET, url));
     }
 
 
