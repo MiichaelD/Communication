@@ -1,108 +1,125 @@
 package serverComm;
 //http://stackoverflow.com/questions/2793150/how-to-use-java-net-urlconnection-to-fire-and-handle-http-requests
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Scanner;
 import java.net.*;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 
+public abstract class ServerCom{
 
-public class ServerConn{
+	public enum Method{
+		GET,
+		POST,
+		DELETE,
+		PUT;
+	}
+	
+    public static final String CHARSET = "UTF-8";
 
-    //
-    public static final int metNONE = 0, metGET = 1, metPOST = 2;
-
-    public static final String charset = "UTF-8";
-
-    //default connection timeout - 2 secs
-    public static int defConTimeout = 10000;
-
-
-    public static void main(String args[]){
-        Scanner in=new Scanner(System.in);
-        System.out.print("Write a message to the server: ");
-        String url = "http://yo-t.besaba.com/solution/index.php";
-        try{
-            String query = String.format("snit=MATARILE&p1=%s&p2=%s&p3=%s&p4=%s&p5=%s",
-            		URLEncoder.encode(in.next(), charset),
-            		URLEncoder.encode(in.next(), charset),
-            		URLEncoder.encode(in.next(), charset),
-            		URLEncoder.encode(in.next(), charset),
-            		URLEncoder.encode(in.next(), charset));
-            HttpURLConnection connection;
-
-
-            connection = Connect(metGET,url,query);
-            System.out.println("Server's GET response: \'" +getResponse(connection)+"\'");
-
-            connection = Connect(metPOST,url,query);
-            System.out.println("Server's POST response: \'"+getResponse(connection)+"\'");
-        }catch (Exception e){    e.printStackTrace();        System.out.println(e.getMessage());    }
-
-    }
+    /** Default connection timeout is 2.5 secs*/
+    public int CONNECTION_TIMEOUT_MS = 2500;
+    
+    /** if the connection needs any special request properties to be added, include them in this map
+     * NOTE: regarding to http://programmers.stackexchange.com/questions/162643/why-is-clean-code-suggesting-avoiding-protected-variables
+     * 1) descendant class actually does stuff with this member.
+     * 2) inheritors can forget about this member variable and wrong will happen
+     * 3) same as 2, we make an assumption that the inheritor may forget about this member, that doesn't modify this class' behavior/functionality
+     * 4) we do lose a bit of responsibility over this variable but its state is irrelevant for this class */
+    protected Map<String, String> m_requestProperties = null;
+    
 
 
     /**Check if we are connected a network regardless if it's wifi's or mobile's
      * @return true if we are connected to a network, otherwise false     */
-    public static boolean isNetworkAvailable() {
-        boolean ret = true;
-
-        return ret;
-    }
-
-
-    public static boolean haveNetworkConnection() {
-        return false;
-    }
-
-
+    public abstract boolean isNetworkAvailable();
 
     /** create a new connection
-     * @params int mMethod:    0 for no query, 1 for metod GET, 2 for metod POST
-     * @params string mUrl:    string containing the url
+     * @params int method:  0 for no query, 1 for metod GET, 2 for metod POST
+     * @params string url:	string containing the url
+     * @params Map query:   map containing pairs of properties and values to be added to the connection as query string
+     * @return an HttpURLConnection or null if there is no network available     */
+    public HttpURLConnection openConnection(Method method, String url, Map<String,String> queryMap)throws Exception{
+    	return openConnection(method,url,buildQuery(queryMap));
+    }
+    
+    /** create a new connection
+     * @params int method:    0 for no query, 1 for metod GET, 2 for metod POST
+     * @params string url:    string containing the url
      * @params string query:    string containing the query
      * @return an HttpURLConnection or null if there is no network available     */
-    public static HttpURLConnection Connect(int mMethod, String mUrl, String query)throws Exception{
+    private HttpURLConnection openConnection(Method method, String url, String query)throws Exception{
 
-        if( !ServerConn.isNetworkAvailable() )
+        if( !isNetworkAvailable() )
             return null;
 
-        if (!mUrl.startsWith("http"))
-            mUrl = "http://" + mUrl;
-
-        //query = URLEncoder.encode(query,"UTF-8");
+        if (!(url.startsWith("http") || url.startsWith("https")))
+        	url = "http://" + url;
 
         HttpURLConnection conn = null;
         //set the type of request
-        switch(mMethod){
-        case metGET:
-            if (query != null)
-                conn = (HttpURLConnection) new URL(mUrl+"?"+query).openConnection();
-            else
-                conn = (HttpURLConnection) new URL(mUrl).openConnection();
+        switch(method){
+        case GET:
+            conn = (HttpURLConnection) new URL(url+"?"+(query!=null?query:"")).openConnection();
             conn.setRequestMethod("GET");
-            conn.setConnectTimeout(defConTimeout);
+            addRequestProperties(conn);
+            conn.setConnectTimeout(CONNECTION_TIMEOUT_MS);
             break;
-        case metPOST:
-            conn = (HttpURLConnection) new URL(mUrl).openConnection();
+        case POST:
+            conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
-            conn.addRequestProperty("X-Requested-With","MiichaelD");
             conn.setDoOutput(true); // this set POST method
-            conn.setConnectTimeout(defConTimeout);
+            addRequestProperties(conn);
+            conn.setConnectTimeout(CONNECTION_TIMEOUT_MS);
             OutputStream output=null;
             try{//write the query
                 output = conn.getOutputStream();
-                output.write(query.getBytes(charset));
+                output.write(query.getBytes(CHARSET));
                 output.close();
             }catch(IOException ex){    System.out.println(ex.getMessage());}
             break;
         default:
-            conn = (HttpURLConnection) new URL(mUrl).openConnection();
+            conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setUseCaches(true);
-            conn.setConnectTimeout(defConTimeout);
+            addRequestProperties(conn);
+            conn.setConnectTimeout(CONNECTION_TIMEOUT_MS);
             break;
         }
         return conn;
+    }
+    
+    public final String buildQuery(Map<String, String> queryMap){
+    	if (queryMap == null)
+    		return null;
+    	
+    	StringBuilder sb = new StringBuilder();
+    	Iterator<Map.Entry<String, String>> it = queryMap.entrySet().iterator();
+    	boolean hasNext = it.hasNext();
+		while (hasNext){
+			Map.Entry<String,String> pair = it.next();
+			hasNext = it.hasNext();
+			try {
+				sb.append(URLEncoder.encode(pair.getKey(),CHARSET)).append('=').append((URLEncoder.encode(pair.getValue(),CHARSET)));
+			} catch (UnsupportedEncodingException e) {
+				// Do nothing, since charset UTF-8 is fully supported by every virtual machine
+			}
+			if(hasNext)
+				sb.append('&');
+		}
+    	return sb.toString();
+    }
+    
+    private final void addRequestProperties(HttpURLConnection conn){
+    	if(m_requestProperties != null){
+    		Iterator<Map.Entry<String, String>> it =  m_requestProperties.entrySet().iterator();
+    		while (it.hasNext()){
+    			Map.Entry<String,String> pair = it.next();
+    			conn.addRequestProperty(pair.getKey(),pair.getValue());	
+    		}
+    	}
     }
 
 
@@ -136,8 +153,8 @@ public class ServerConn{
      * @return a string containing the servers response or null if no network is available
      * @throws Exception
      */
-    public static String getResponse(String mUrl) throws Exception    {
-        if( !ServerConn.isNetworkAvailable() )
+    public String getResponse(String mUrl) throws Exception    {
+        if( !isNetworkAvailable() )
             return null;
         HttpURLConnection conn;
         Scanner rd;
@@ -158,7 +175,7 @@ public class ServerConn{
 
 
 
-    public static void printConnProps(HttpURLConnection conn)throws IOException{
+    public void printConnProps(HttpURLConnection conn)throws IOException{
         System.out.println("method: "+conn.getRequestMethod());
         System.out.println("response code: "+conn.getResponseCode());
         System.out.println("response Message: "+conn.getResponseMessage());
