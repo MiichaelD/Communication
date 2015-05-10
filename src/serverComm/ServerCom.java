@@ -11,6 +11,8 @@ import java.io.UnsupportedEncodingException;
 
 public abstract class ServerCom{
 
+	protected ServerCom(){}
+	
 	public enum Method{
 		GET,
 		POST,
@@ -45,7 +47,7 @@ public abstract class ServerCom{
     }
 
     /** create a new connection
-     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @params query:   Map containing pairs of properties and values to be added to the connection as query string
      * @return an HttpURLConnection or null if there is no network available
      * @throws Exception     */
     public HttpURLConnection openConnection( Map<String,String> queryMap)throws Exception{
@@ -54,7 +56,7 @@ public abstract class ServerCom{
     
     /** create a new connection
      * @params int method:  HTTP method to use
-     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @params query:   Map containing pairs of properties and values to be added to the connection as query string
      * @return an HttpURLConnection or null if there is no network available
      * @throws Exception     */
     public HttpURLConnection openConnection(Method method, Map<String,String> queryMap)throws Exception{
@@ -62,9 +64,18 @@ public abstract class ServerCom{
     }
     
     /** create a new connection
-     * @params int method:  HTTP method to use
-     * @params string url:	String containing the url
-     * @params Map query:   Map containing pairs of properties and values to be added to the connection as query string
+     * @params method:  HTTP method to use
+     * @params query:    string containing the query
+     * @return an HttpURLConnection or null if there is no network available
+     * @throws Exception     */
+    public HttpURLConnection openConnection(Method method, String query)throws Exception{
+    	return openConnection(method,m_mainUrl,query);
+    }
+    
+    /** create a new connection
+     * @params method:  HTTP method to use
+     * @params url:	String containing the url
+     * @params query:   Map containing pairs of properties and values to be added to the connection as query string
      * @return an HttpURLConnection or null if there is no network available
      * @throws Exception     */
     public HttpURLConnection openConnection(Method method, String url, Map<String,String> queryMap)throws Exception{
@@ -72,12 +83,12 @@ public abstract class ServerCom{
     }
     
     /** create a new connection
-     * @params int method:    0 for no query, 1 for metod GET, 2 for metod POST
-     * @params string url:    string containing the url
-     * @params string query:    string containing the query
+     * @params method:    0 for no query, 1 for metod GET, 2 for metod POST
+     * @params url:    string containing the url
+     * @params query:    string containing the query
      * @return an HttpURLConnection or null if there is no network available
      * @throws Exception     */
-    private HttpURLConnection openConnection(Method method, String url, String query)throws Exception{
+    public HttpURLConnection openConnection(Method method, String url, String query)throws Exception{
         if( !isNetworkAvailable() )
             return null;
 
@@ -169,7 +180,7 @@ public abstract class ServerCom{
      * @param conn an opened connection
      * @return the servers response or null if no connection exists
      * @throws Exception     */
-    public static String getResponse(HttpURLConnection conn)throws Exception{
+    public String getResponse(HttpURLConnection conn)throws Exception{
         if ( conn == null )
             return null;
 
