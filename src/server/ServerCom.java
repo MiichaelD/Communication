@@ -37,7 +37,7 @@ public abstract class ServerCom{
     
     /** constant strings delimiting the file to be sent to the server */
     private static final String BOUNDARY = "*****";
-    private static final String LINE_END = "\r\n";
+    private static final String CRLF = "\r\n";
     private static final String TWO_HYPHENS = "--";
 
     /** Default connection timeout is 2.5 secs*/
@@ -87,9 +87,34 @@ public abstract class ServerCom{
 	        conn.setUseCaches(false);
 	
 	        output = conn.getOutputStream();
-	        output.write((TWO_HYPHENS + BOUNDARY + LINE_END).getBytes(CHARSET));
-	        output.write(("Content-Disposition: form-data; name=\"upload\"; filename=\""+randomFileName+"\""+LINE_END).getBytes(CHARSET));
-	        output.write(LINE_END.getBytes(CHARSET));
+	        output.write((TWO_HYPHENS + BOUNDARY + CRLF).getBytes(CHARSET));
+	        output.write(("Content-Disposition: form-data; name=\"upload\"; filename=\""+randomFileName+"\""+CRLF).getBytes(CHARSET));
+	        output.write(CRLF.getBytes(CHARSET));
+	        
+	        /* in case we'd like to send:
+	         * Normal param.
+	            output.write("--" + boundary + CRLF);
+	            output.write("Content-Disposition: form-data; name=\"param\"" + CRLF);
+	            output.write("Content-Type: text/plain; charset=" + charset + CRLF);
+	            output.write(CRLF);
+	            output.write(param).append(CRLF);
+
+             * Text file.
+	            output.write("--" + boundary + CRLF);
+	            output.write("Content-Disposition: form-data; name=\"textFile\"; filename=\"" + textFile.getName() + "\"" + CRLF);
+	            output.write("Content-Type: text/plain; charset=" + charset + CRLF);
+	            output.write(CRLF);
+	            // read and write the file
+	            output.write(CRLF.getBytes(CHARSET));
+
+	         * binary file:
+	            output.write("--" + boundary + CRLF);
+	        	output.write("Content-Disposition: form-data; name=\"binaryFile\"; filename=\"" + binaryFile.getName() + "\"" + CRLF);
+            	output.write("Content-Type: " + URLConnection.guessContentTypeFromName(binaryFile.getName())+CRLF);
+            	output.write("Content-Transfer-Encoding: binary" + CRLF);
+	            // read and write the file
+	            output.write(CRLF.getBytes(CHARSET));
+             */
 	
 	        // create a buffer of maximum size
 	        int bytesAvailable = fileInputStream.available();
@@ -101,9 +126,9 @@ public abstract class ServerCom{
 	            output.write(buffer, 0, bytesRead);
 	        }
 	
-	        // send multipart form data necesssary after file data...
-	        output.write(LINE_END.getBytes(CHARSET));
-	        output.write((TWO_HYPHENS + BOUNDARY + TWO_HYPHENS + LINE_END).getBytes(CHARSET));
+	        // Send multipart form data necesssary after file data...
+	        output.write(CRLF.getBytes(CHARSET));
+	        output.write((TWO_HYPHENS + BOUNDARY + TWO_HYPHENS + CRLF).getBytes(CHARSET));// Terminating string
         }finally{
 	        // close streams
         	if( fileInputStream != null)
@@ -399,71 +424,5 @@ public abstract class ServerCom{
         return null;
     }
 */
-
-
-/*public static uploadFile(){
-        String param = "value";
-        File textFile = new File("/path/to/file.txt");
-        File binaryFile = new File("/path/to/file.bin");
-        String boundary = Long.toHexString(System.currentTimeMillis()); // Just generate some unique random value.
-        String CRLF = "\r\n"; // Line separator required by multipart/form-data.
-
-        URLConnection connection = new URL(url).openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-        PrintWriter writer = null;
-        try {
-            OutputStream output = connection.getOutputStream();
-            writer = new PrintWriter(new OutputStreamWriter(output, charset), true); // true = autoFlush, important!
-
-            // Send normal param.
-            writer.append("--" + boundary).append(CRLF);
-            writer.append("Content-Disposition: form-data; name=\"param\"").append(CRLF);
-            writer.append("Content-Type: text/plain; charset=" + charset).append(CRLF);
-            writer.append(CRLF);
-            writer.append(param).append(CRLF).flush();
-
-            // Send text file.
-            writer.append("--" + boundary).append(CRLF);
-            writer.append("Content-Disposition: form-data; name=\"textFile\"; filename=\"" + textFile.getName() + "\"").append(CRLF);
-            writer.append("Content-Type: text/plain; charset=" + charset).append(CRLF);
-            writer.append(CRLF).flush();
-            BufferedReader reader = null;
-            try {
-                reader = new BufferedReader(new InputStreamReader(new FileInputStream(textFile), charset));
-                for (String line; (line = reader.readLine()) != null;) {
-                    writer.append(line).append(CRLF);
-                }
-            } finally {
-                if (reader != null) try { reader.close(); } catch (IOException logOrIgnore) {}
-            }
-            writer.flush();
-
-            // Send binary file.
-            writer.append("--" + boundary).append(CRLF);
-            writer.append("Content-Disposition: form-data; name=\"binaryFile\"; filename=\"" + binaryFile.getName() + "\"").append(CRLF);
-            writer.append("Content-Type: " + URLConnection.guessContentTypeFromName(binaryFile.getName())).append(CRLF);
-            writer.append("Content-Transfer-Encoding: binary").append(CRLF);
-            writer.append(CRLF).flush();
-            InputStream input = null;
-            try {
-                input = new FileInputStream(binaryFile);
-                byte[] buffer = new byte[1024];
-                for (int length = 0; (length = input.read(buffer)) > 0;) {
-                    output.write(buffer, 0, length);
-                }
-                output.flush(); // Important! Output cannot be closed. Close of writer will close output as well.
-            } finally {
-                if (input != null) try { input.close(); } catch (IOException logOrIgnore) {}
-            }
-            writer.append(CRLF).flush(); // CRLF is important! It indicates end of binary boundary.
-
-            // End of multipart/form-data.
-            writer.append("--" + boundary + "--").append(CRLF);
-        } finally {
-            if (writer != null) writer.close();
-        }
-    }
- */
 
 }
