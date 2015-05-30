@@ -3,10 +3,12 @@ package server;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Scanner;
 import java.net.*;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 
 public abstract class ServerCom{
@@ -87,8 +89,9 @@ public abstract class ServerCom{
      * @params url:    string containing the url
      * @params query:    string containing the query
      * @return an HttpURLConnection or null if there is no network available
-     * @throws Exception     */
-    public HttpURLConnection openConnection(Method method, String url, String query)throws Exception{
+     * @throws IOException 
+     * @throws MalformedURLException */
+    public HttpURLConnection openConnection(Method method, String url, String query) throws MalformedURLException, IOException{
         if( !isNetworkAvailable() )
             return null;
 
@@ -160,7 +163,10 @@ public abstract class ServerCom{
     /** Iterate through the map of properties and add them to the connection request 
      * @params conn   recently open HttpURLConnection to add requests properties.
      * @return Query string formated and encoded*/
-    private final void addRequestProperties(HttpURLConnection conn){
+    private final void addRequestProperties(final HttpURLConnection conn){
+    	if ( conn == null )
+            throw new IllegalArgumentException("HTTP connection may not be null");
+    	
     	if(m_requestProperties != null){
     		Iterator<Map.Entry<String, String>> it =  m_requestProperties.entrySet().iterator();
     		while (it.hasNext()){
@@ -168,7 +174,7 @@ public abstract class ServerCom{
     			try {
     				conn.addRequestProperty(URLEncoder.encode(pair.getKey(),CHARSET), URLEncoder.encode(pair.getValue(),CHARSET));
     			} catch (UnsupportedEncodingException e) {
-    				// Do nothing, since UTF-8 charset is fully supported by every virtual machine.
+    				// Do nothing, UTF-8 charset should be fully supported by every virtual machine, though.
     			}
     		}
     	}
@@ -179,22 +185,41 @@ public abstract class ServerCom{
     /**Get a response from a httpURLconnection as String
      * @param conn an opened connection
      * @return the servers response or null if no connection exists
-     * @throws Exception     */
-    public String getResponse(HttpURLConnection conn)throws Exception{
+     * @throws IOException, IllegalArgumentException*/
+    public String getResponse(final HttpURLConnection conn) throws IOException, IllegalArgumentException{
         if ( conn == null )
-            return null;
+            throw new IllegalArgumentException("HTTP connection may not be null");
 
-        StringBuffer result = new StringBuffer("");
-        Scanner reader;
-        //get the response and append it
-        reader = new Scanner(conn.getInputStream());
-        while (reader.hasNextLine()) {
-            result.append(reader.nextLine());
+        if (conn.getContentLengthLong() >= Integer.MAX_VALUE )
+            throw new IllegalArgumentException("HTTP connection too large to be buffered in memory");
+        
+        InputStream instream = conn.getInputStream();
+        if(instream == null)
+        	return null;
+        
+        String charset = conn.getContentEncoding();
+        if (charset == null) {
+            charset = CHARSET;
         }
-        reader.close();
-        conn.disconnect();
-        conn = null;
 
+        Reader reader = null;
+        try{
+        	reader = new InputStreamReader(instream, charset);
+        } catch (UnsupportedEncodingException uee){
+        	reader = new InputStreamReader(instream, CHARSET);
+        }
+        
+        StringBuffer result = new StringBuffer("");
+        try {
+            char[] tmp = new char[2048];
+            int l;
+            while ((l = reader.read(tmp)) != -1) {
+            	result.append(tmp, 0, l);
+            }
+        } finally {
+        	reader.close();
+        	conn.disconnect();
+        }
         return result.toString();
     }
 
@@ -203,14 +228,18 @@ public abstract class ServerCom{
      * should have the necessary query parameters included.
      * @param url servers URL
      * @return a string containing the servers response or null if no network is available
-     * @throws Exception */
-    public String getResponse(String url) throws Exception    {
+     * @throws Exception*/
+    public String getResponse(String url) throws Exception {
     	return getResponse(openConnection(Method.GET, url));
     }
 
-
-    /** print useful information about the given HttpURLConnection*/
-    public void printConnProps(HttpURLConnection conn)throws IOException{
+    /** print useful information about the given HttpURLConnection
+     * @throws IOException
+     * @throws IllegalArgumentException*/
+    public void printConnProps(final HttpURLConnection conn)throws IOException{
+    	if(conn == null)
+            throw new IllegalArgumentException("HTTP connection may not be null");
+    	
         System.out.println("method: "+conn.getRequestMethod());
         System.out.println("response code: "+conn.getResponseCode());
         System.out.println("response Message: "+conn.getResponseMessage());
