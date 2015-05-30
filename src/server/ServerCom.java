@@ -3,13 +3,21 @@ package server;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.net.*;
+import java.util.UUID;
+
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLEncoder;
 
 public abstract class ServerCom{
 
@@ -24,7 +32,13 @@ public abstract class ServerCom{
 	
 	protected String m_mainUrl = null;
 	
+	/** Default Charset to use*/
     public static final String CHARSET = "UTF-8";
+    
+    /** constant strings delimiting the file to be sent to the server */
+    private static final String BOUNDARY = "*****";
+    private static final String LINE_END = "\r\n";
+    private static final String TWO_HYPHENS = "--";
 
     /** Default connection timeout is 2.5 secs*/
     public int CONNECTION_TIMEOUT_MS = 2500;
@@ -40,6 +54,68 @@ public abstract class ServerCom{
     /**Check if we are connected a network regardless if it's wifi's or mobile's
      * @return true if we are connected to a network, otherwise false     */
     public abstract boolean isNetworkAvailable();
+    
+    
+    /** Method used for uploading a file to a server;
+     * @param url  The server to upload the file to
+     * @param file The path to get to the file including its name 
+     * @throws IOException 
+     * @throws MalformedURLException */
+    public String uploadFile(String url, String file) throws MalformedURLException, IOException {
+    	return uploadFile(url, new File(file));
+     }
+    
+    /** Method used for uploading a file to a server;
+     * @param url  The server to upload the file to
+     * @param file File to upload 
+     * @throws IOException 
+     * @throws MalformedURLException */
+    public String uploadFile(String url, File file) throws MalformedURLException, IOException {
+        String randomFileName = UUID.randomUUID() + ".gz";
+    	
+        FileInputStream fileInputStream = new FileInputStream(file);
+        
+        Map<String, String> properties = new java.util.HashMap<String, String>();
+        properties.put("Connection","Keep-Alive");
+        properties.put("Content-Type", "multipart/form-data;boundary=" + BOUNDARY);
+        
+        // Open a connection using POST method
+        HttpURLConnection conn = openConnection(Method.POST, url, buildQuery(null));
+        OutputStream output = null;
+        try{
+	        // Don't use a cached copy.
+	        conn.setUseCaches(false);
+	
+	        output = conn.getOutputStream();
+	        output.write((TWO_HYPHENS + BOUNDARY + LINE_END).getBytes(CHARSET));
+	        output.write(("Content-Disposition: form-data; name=\"upload\"; filename=\""+randomFileName+"\""+LINE_END).getBytes(CHARSET));
+	        output.write(LINE_END.getBytes(CHARSET));
+	
+	        // create a buffer of maximum size
+	        int bytesAvailable = fileInputStream.available();
+	        int bufferSize = Math.min(bytesAvailable, 1024*1024);
+	        byte buffer[] = new byte[bufferSize];
+	        int bytesRead = 0;
+	        // read file and write it into form...
+	        while ( (bytesRead = fileInputStream.read(buffer, 0, bufferSize)) > 0) {
+	            output.write(buffer, 0, bytesRead);
+	        }
+	
+	        // send multipart form data necesssary after file data...
+	        output.write(LINE_END.getBytes(CHARSET));
+	        output.write((TWO_HYPHENS + BOUNDARY + TWO_HYPHENS + LINE_END).getBytes(CHARSET));
+        }finally{
+	        // close streams
+        	if( fileInputStream != null)
+        		fileInputStream.close();
+        	if( output != null){
+		        output.flush();
+		        output.close();
+        	}
+        }
+        return getResponse(conn);
+    }
+    
     
     /** create a new connection
      * @return an HttpURLConnection or null if there is no network available
@@ -103,22 +179,22 @@ public abstract class ServerCom{
         switch(method){
         case GET:
             conn = (HttpURLConnection) new URL(url+"?"+(query!=null?query:"")).openConnection();
-            conn.setRequestMethod("GET");
+            conn.setRequestMethod(Method.GET.toString());
             addRequestProperties(conn);
             conn.setConnectTimeout(CONNECTION_TIMEOUT_MS);
             break;
         case POST:
             conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod("POST");
+            conn.setRequestMethod(Method.GET.toString());
             conn.setDoOutput(true); // this set POST method
             addRequestProperties(conn);
             conn.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-            OutputStream output=null;
-            try{//write the query
+            if (query != null){
+            	OutputStream output=null;
                 output = conn.getOutputStream();
                 output.write(query.getBytes(CHARSET));
                 output.close();
-            }catch(IOException ex){    System.out.println(ex.getMessage());}
+            }
             break;
         case PUT:
         	//TODO
