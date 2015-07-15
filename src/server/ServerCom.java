@@ -49,7 +49,7 @@ public abstract class ServerCom{
      * 2) inheritors can forget about this member variable and wrong will happen
      * 3) same as 2, we make an assumption that the inheritor may forget about this member, that doesn't modify this class' behavior/functionality
      * 4) we do lose a bit of responsibility over this variable but its state is irrelevant for this class */
-    protected Map<String, String> m_requestProperties = null;
+    protected Map<String, String> m_requestProperties = null, m_tempRequestProperties = null;
     
     /**Check if we are connected a network regardless if it's wifi's or mobile's
      * @return true if we are connected to a network, otherwise false     */
@@ -264,7 +264,7 @@ public abstract class ServerCom{
     /** Iterate through the map of properties and add them to the connection request 
      * @params conn   recently open HttpURLConnection to add requests properties.
      * @return Query string formated and encoded*/
-    private final void addRequestProperties(final HttpURLConnection conn){
+    private final void addRequestProperties(HttpURLConnection conn){
     	if ( conn == null )
             throw new IllegalArgumentException("HTTP connection may not be null");
     	
@@ -279,8 +279,24 @@ public abstract class ServerCom{
     			}
     		}
     	}
+    	
+    	if (m_tempRequestProperties != null){
+    		Iterator<Map.Entry<String, String>> it =  m_tempRequestProperties.entrySet().iterator();
+    		while (it.hasNext()){
+    			Map.Entry<String,String> pair = it.next();
+    			try {
+    				conn.addRequestProperty(URLEncoder.encode(pair.getKey(),CHARSET), URLEncoder.encode(pair.getValue(),CHARSET));
+    			} catch (UnsupportedEncodingException e) {
+    				// Do nothing, UTF-8 charset should be fully supported by every virtual machine, though.
+    			}
+    		}
+    		m_tempRequestProperties = null;
+    	}
     }
 
+    public void setTemporalRequestProperties(Map<String, String> temp){
+    	m_tempRequestProperties = temp;
+    }
 
 
     /**Get a response from a httpURLconnection as String
